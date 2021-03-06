@@ -1,26 +1,21 @@
 import pywikibot
-import re
+# import re
+# import asyncio
+# import json
 import sys
 # from itertools import chain
+from disambig_basic import *
 from list_disambig_articles import list_disambig_articles
 
 
-def find_link(text, link):
-    pattern = r"\[\[" + re.escape(link) + r"(#[^\[\]]*?)?(\|.*?)?\]\]"
-    return re.search(pattern, text) != None
-
-
-def replace_link(text, oldlink, newlink):
-    pattern = r"\[\[" + re.escape(oldlink) + r"(#[^\[\]]*?)?(\|[^\[\]]*?)\]\]"
-    repl = r"[[" + newlink + r"\1\2]]"
-    text = re.sub(pattern, repl, text)
-    pattern = r"\[\[" + re.escape(oldlink) + r"(#[^\[\]]*?)?\]\]"
-    repl = r"[[" + newlink + r"\1|" + oldlink + r"]]"
-    text = re.sub(pattern, repl, text)
-    return text
-
-
-def disambig_linkshere(disambig, articles=None, do_edit=False, show_manual=False, backlink_except=None):
+def disambig_linkshere(disambig, articles=None, process=NoneProcess(), print_procedure=True, do_edit=False, show_manual=False, excepts=None):
+    # print("disambig_linkshere(" + disambig.title() + ")")
+    if excepts:
+        backlink_except = (excepts["BACKLINK_EXCEPT"].get(disambig.title()) or list()) + (excepts["BACKLINK_EXCEPT"].get("") or list())
+        article_except = (excepts["ARTICLE_EXCEPT"].get(disambig.title()) or list()) + (excepts["ARTICLE_EXCEPT"].get("") or list())
+    else:
+        backlink_except = article_except = list()
+    
     if articles:
         for article in articles:
             if article.get("title") and article.get("keywords"):
@@ -36,104 +31,90 @@ def disambig_linkshere(disambig, articles=None, do_edit=False, show_manual=False
                 article["title"] = disambig.title() + '(' + article["suffix"] + ')'
                 article["keywords"].add(article["suffix"])
             else:
-                print("Error: lack title and categories, suffix, or prefix in" + article)
+                process.print("Error: lack title and categories, suffix, or prefix in" + article)
                 return False
     else:
-        articles = list_disambig_articles(disambig, dropout_multi_articles=True, dropout_no_keyword=True)
+        articles = list_disambig_articles(disambig, process=process, article_except=article_except, dropout_multi_articles=True, dropout_no_keyword=True)
+    
+    # print("articles =", articles)
     
     autos = list()
     manuals = list()
     article_titles = list(article["title"] for article in articles)
 
-    if all((any(("崩坏" in keyword for keyword in article["keywords"])) for article in articles)): # 崩坏学园2 and 崩坏3 # f**k
-        return "skip"
+    # if all((any(("崩坏" in keyword for keyword in article["keywords"])) for article in articles)): # 崩坏学园2 and 崩坏3 # f**k
+    #     return "skip"
     
+    # print([disambig] + list(disambig.backlinks(filter_redirects=True)))
     # for redirect in chain(iter([disambig]), disambig.backlinks(filter_redirects=True)):
     for redirect in [disambig] + list(disambig.backlinks(filter_redirects=True)):
-        print("====", redirect.title(), "====")
+        # print("redirect = " + redirect.title())
+        if print_procedure:
+            process.print("====", redirect.title(), "(" + str(len(list(redirect.backlinks(filter_redirects=False)))) + ") ====")
         # for linksto in site.search("linksto:" + disambig.title()):
         for backlink in redirect.backlinks(filter_redirects=False):
+            # print("backlink = " + backlink.title())
             if "Talk" in backlink.namespace() or "talk" in backlink.namespace():
                 continue
             elif not backlink.namespace() in ("", "Template"):
                 manuals.append(backlink)
                 continue
-            if backlink.title() in article_titles \
-                or (backlink_except and backlink.title() in backlink_except) \
-                or "Category:消歧义页" in (category.title() for category in backlink.categories()) \
+            backlink_redirect_titles = [backlink.title()] + list(backlink_redirect.title() for backlink_redirect in backlink.backlinks(filter_redirects=True))
+            # backlink_redirect_titles += list(map(capitalize, backlink_redirect_titles)) + list(map(minusculize, backlink_redirect_titles))
+            # backlink_redirect_titles += list(map(s2t.convert, backlink_redirect_titles)) + list(map(t2s.convert, backlink_redirect_titles))
+            # print(backlink_redirect_titles)
+            if (set(map(link_preproc, backlink_redirect_titles)) & set(map(link_preproc, article_titles + backlink_except))) \
+                or backlink.isDisambig() \
                 or not find_link(backlink.text, redirect.title()):
                 continue
-            raw_relations = dict() # categories and keyword links related to articles
+            relations = dict() # categories and keyword links related to articles
             for article in articles:
-                raw_relations[article["title"]] = set()
+                relation = set()
                 for keyword in article["keywords"]:
                     for category in backlink.categories():
-                        if category.title().find(keyword) >= 0:
-                            raw_relations[article["title"]].add(category.title())
-            for line in backlink.text.splitlines():
-                if find_link(line, redirect.title()):
-                    for article in articles:
-                        for keyword in article["keywords"]:
-                            if find_link(line, keyword):
-                                raw_relations[article["title"]].add(keyword)
-            relations = dict()
-            for article_title in raw_relations:
-                if raw_relations[article_title]:
-                   relations[article_title] = raw_relations[article_title]
-            print(backlink.title(), relations, backlink.full_url(), sep=", ")
+                        if find_word(category.title(), keyword):
+                            relation.add(category.title())
+                    if find_word(backlink.title(), keyword):
+                        relation.add(backlink.title())
+                if relation:
+                    relations[article["link"]] = relation
+            if not relations:
+                for line in backlink.text.splitlines():
+                    if find_link(line, redirect.title()):
+                        for article in articles:
+                            for keyword in article["keywords"]:
+                                if keyword != redirect.title() and find_link(line, keyword):
+                                    if article["link"] not in relations:
+                                        relations[article["link"]] = set()
+                                    relations[article["link"]].add("keyword=" + keyword)
+            if print_procedure:
+                process.print(backlink.title(), relations, backlink.full_url(), sep=", ")
             if len(relations) != 1:
                 manuals.append(backlink)
                 continue
-            article_title = list(relations.keys())[0]
-            autos.append((backlink, redirect.title(), article_title, relations[article_title]))
+            article_link = list(relations.keys())[0]
+            autos.append((backlink, redirect.title(), article_link, relations[article_link]))
     
     if not autos:
         return "none"
     
-    print("====== autos:", disambig.title(), "======")
+    process.print("====== autos:", disambig.title(), "======")
     index = 0
-    for (backlink, redirect_title, article_title, categories) in autos:
+    for (backlink, redirect_title, article_link, article_relations) in autos:
         index += 1
-        print(index, backlink.title(), redirect_title, article_title, categories, backlink.full_url(), sep=", ")
+        process.print(index, backlink.title(), redirect_title, article_link, article_relations, backlink.full_url(), sep=", ")
 
-    passes = list()
-    if not do_edit:
-        while True:
-            print(end="Action? (y[es] / [n]o / [p]ass some / [r]edo / [q]uit): ")
-            order = input()
-            if not order:
-                pass
-            elif order[0] == 'y':
-                do_edit = True
-                break
-            elif order[0] == 'n':
-                break
-            elif order[0] == 'r':
-                return "redo"
-            elif order[0] == 'q':
-                return "quit"
-            elif order[0] == 'p':
-                print(end="Pass which ones? ")
-                passes = input().split()
-                break
-    
-    if do_edit:
-        index = 0
-        for (backlink, redirect_title, article_title, categories) in autos:
-            index += 1
-            if index in passes:
-                continue
-            backlink.text = replace_link(backlink.text, redirect_title, article_title)
-            backlink.save(summary="消歧义：[[" + redirect_title + "]]→[[" + article_title + "]]"
-                + "。本次编辑由机器人进行，如修改有误，请撤销或更正，并[[User_talk:C8H17OH|联系操作者]]。",
-                asynchronous=True, watch="nochange", minor=True, botflag=True)
-    
-    if show_manual:
-        print("====== manuals:", disambig.title(), "======")
-        for manual in manuals:
-            print(manual.title(), manual.full_url())
-    
-    return "done" if do_edit else "deny"
+    # if asynchronous:
+        # result_file = open("scripts/userscripts/disambig_result.json", mode="r", encoding="UTF-8")
+        # result_json = json.load(result_file)
+        # result_file.close()
+        # result_json[disambig.title()] = list((backlink.title(), redirect_title, article_link, tuple(article_relations))
+        #     for (backlink, redirect_title, article_link, article_relations) in autos)
+        # result_file = open("scripts/userscripts/disambig_result.json", mode="w", encoding="UTF-8")
+        # json.dump(result_json, result_file, ensure_ascii=False, indent=4)
+        # result_file.close()
+    # else:
+    return process.action(disambig, autos, manuals, do_edit=do_edit, show_manual=show_manual)
 
 
 def disambig_linkshere_main():
@@ -158,10 +139,15 @@ def disambig_linkshere_main():
     #     {"suffix": "封印者"},
     # ], do_edit=False, show_manual=True)
 
+    site = pywikibot.Site()
     if len(sys.argv) == 2:
-        site = pywikibot.Site()
         disambig = pywikibot.Page(site, sys.argv[1])
-        disambig_linkshere(disambig, do_edit=False, show_manual=False)
+        disambig_linkshere(disambig, do_edit=False, show_manual=True)
+    else:
+        disambig = pywikibot.Page(site, "芭芭拉")
+        disambig_linkshere(disambig, [
+            {"suffix": "原神"}
+        ], do_edit=False, show_manual=True)
     
 
 if __name__ == '__main__':
