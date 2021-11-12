@@ -1,3 +1,5 @@
+import json
+import typing
 import pywikibot
 # import re
 # import asyncio
@@ -5,10 +7,19 @@ import pywikibot
 import sys
 # from itertools import chain
 from disambig_basic import *
+from disambig_task_process import TaskProcess
 from list_disambig_articles import list_disambig_articles
 
 
-def disambig_linkshere(disambig, articles=None, process=NoneProcess(), print_procedure=True, do_edit=False, show_manual=False, excepts=None):
+def disambig_linkshere(
+    disambig: pywikibot.Page,
+    articles: typing.List[typing.Dict[str, typing.Union[str, typing.Set[str]]]] = [],
+    process: typing.Union[TaskProcess, NoneProcess] = NoneProcess(),
+    print_procedure: bool = True,
+    do_edit: bool = False,
+    show_manual: bool = False,
+    excepts: typing.Dict[str, typing.Union[typing.List[str], typing.Dict[str, typing.List[str]]]] = {}
+) -> typing.Union[str, bool]:
     # print("disambig_linkshere(" + disambig.title() + ")")
     if excepts:
         backlink_except = (excepts["BACKLINK_EXCEPT"].get(disambig.title()) or list()) + (excepts["BACKLINK_EXCEPT"].get("") or list())
@@ -141,8 +152,11 @@ def disambig_linkshere_main():
 
     site = pywikibot.Site()
     if len(sys.argv) == 2:
+        excepts_file = open("scripts/userscripts/disambig_except.json", mode="r", encoding="UTF-8")
+        excepts = json.load(excepts_file)
         disambig = pywikibot.Page(site, sys.argv[1])
-        disambig_linkshere(disambig, do_edit=False, show_manual=True)
+        disambig_linkshere(disambig, excepts=excepts, do_edit=False, show_manual=True)
+        excepts_file.close()
     else:
         disambig = pywikibot.Page(site, "芭芭拉")
         disambig_linkshere(disambig, [

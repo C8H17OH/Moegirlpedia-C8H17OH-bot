@@ -1,12 +1,16 @@
+import typing
 import pywikibot
 import queue
 import threading
 import time
-from disambig_linkshere import disambig_linkshere_action
+from disambig_basic import disambig_linkshere_action
+import pywikibot
+from scripts.userscripts.disambig_basic import NoneProcess
+from tests import pwb
 
 
-class Task():
-    def __init__(self, func, *args, **kwargs):
+class Task:
+    def __init__(self, func: typing.Callable, *args, **kwargs):
         self.func = func
         self.args = args
         self.kwargs = kwargs
@@ -20,18 +24,18 @@ def process_print(*args, **kwargs):
     pass
 
 
-class TaskProcess(threading.Thread):
+class TaskProcess(threading.Thread, NoneProcess):
     def __init__(self):
         process_print("init")
         threading.Thread.__init__(self)
-        self.tasks = queue.Queue()
-        self.task_lock = threading.Lock()
-        self.running = True
-        self.over = False
-        self.redos = queue.Queue()
+        self.tasks: queue.Queue[Task] = queue.Queue()
+        self.task_lock: threading.Lock = threading.Lock()
+        self.running: bool = True
+        self.over: bool = False
+        self.redos: queue.Queue[pywikibot.Page] = queue.Queue()
         self.redo_lock = threading.Lock()
 
-    def add(self, task):
+    def add(self, task: Task):
         self.task_lock.acquire()
         self.tasks.put(task)
         self.task_lock.release()
@@ -69,7 +73,7 @@ class TaskProcess(threading.Thread):
         self.over = True
         self.join()
     
-    def no_redo(self):
+    def no_redo(self) -> bool:
         self.redo_lock.acquire()
         ret = self.redos.empty()
         self.redo_lock.release()

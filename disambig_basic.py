@@ -1,3 +1,4 @@
+import typing
 import pywikibot
 import re
 import opencc
@@ -6,7 +7,7 @@ s2t = opencc.OpenCC("s2t.json")
 t2s = opencc.OpenCC("t2s.json")
 
 
-class NoneProcess():
+class NoneProcess:
     def print(self, *args, **kwargs):
         return print(*args, **kwargs)
     
@@ -14,14 +15,14 @@ class NoneProcess():
         return disambig_linkshere_action(*args, **kwargs)
 
 
-def bot_save(page: pywikibot.Page, summary: str = ""):
+def bot_save(page: pywikibot.Page, summary: str = "") -> None:
     if summary:
         summary += "。"
     summary += "本次编辑由机器人进行，如修改有误，请撤销或更正，并[[User_talk:C8H17OH|联系操作者]]。"
-    page.save(summary=summary, asynchronous=True, watch="nochange", minor=True, botflag=True)
+    page.save(summary=summary, asynchronous=True, watch="nochange", minor=True, botflag=True, tags=["Bot"])
 
 
-def link_preproc(link):
+def link_preproc(link: str) -> str:
     link = link.strip() # 去除首尾空格
     link = re.escape(link) # 正则表达式化
     link = re.sub(r"(?:\\ |_)", r"(?:\\ |_)", link) # 空格和下划线互通
@@ -36,12 +37,12 @@ def link_preproc(link):
     return ret
 
 
-def find_link(text, link):
+def find_link(text: str, link: str) -> bool:
     pattern = r"\[\[[\ _]*" + link_preproc(link) + r"[\ _]*(\#[^\[\]]*?[\ _]*)?(\|.*?[\ _]*)?[\ _]*\]\]"
     return re.search(pattern, text) != None
 
 
-def replace_link(text, oldlink, newlink):
+def replace_link(text: str, oldlink: str, newlink: str) -> str:
     pattern = r"\[\[[\ _]*" + link_preproc(oldlink) + r"[\ _]*(\#[^\[\]]*?[\ _]*)?(\|[^\[\]]*?[\ _]*)[\ _]*\]\]"
     repl = r"[[" + newlink + r"\1\2]]"
     text = re.sub(pattern, repl, text)
@@ -93,7 +94,7 @@ def replace_link(text, oldlink, newlink):
 #     return text
 
 
-def find_word(text, word):
+def find_word(text: str, word: str) -> bool:
     return re.search(link_preproc(word), text) != None
 
 
@@ -107,7 +108,13 @@ def find_word(text, word):
 #     return ret
 
 
-def disambig_linkshere_action(disambig, autos, manuals, do_edit=False, show_manual=False):
+def disambig_linkshere_action(
+    disambig: pywikibot.Page,
+    autos: typing.List[typing.Tuple[pywikibot.Page, str, pywikibot.Page, typing.Set[str]]],
+    manuals: typing.List[typing.Tuple[pywikibot.Page, str, pywikibot.Page, typing.Set[str]]],
+    do_edit: bool = False,
+    show_manual: bool = False
+) -> str:
     passes = list()
     if not do_edit:
         while True:
@@ -137,9 +144,7 @@ def disambig_linkshere_action(disambig, autos, manuals, do_edit=False, show_manu
             if index in passes:
                 continue
             backlink.text = replace_link(backlink.text, redirect_title, article_link)
-            backlink.save(summary="消歧义：[[" + redirect_title + "]]→[[" + article_link + "]]"
-                + "。本次编辑由机器人进行，如修改有误，请撤销或更正，并[[User_talk:C8H17OH|联系操作者]]。",
-                asynchronous=True, watch="nochange", minor=True, botflag=True)
+            bot_save(backlink, summary="消歧义：[[" + redirect_title + "]]→[[" + article_link + "]]")
     if show_manual:
         print("====== manuals:", disambig.title(), "======")
         for manual in manuals:

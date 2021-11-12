@@ -1,13 +1,14 @@
+import sys
+import typing
 import pywikibot
 import re
-from typing import Union, Optional
 # from disambig_linkshere import disambig_linkshere
 from disambig_task_process import TaskProcess
 from disambig_basic import NoneProcess
 
 
 class Link:
-    def __init__(self, link_tuple):
+    def __init__(self, link_tuple: typing.Tuple[str]):
         (prefix, core, suffix, section, caption) = link_tuple
         self.prefix = prefix
         self.core = core
@@ -15,7 +16,7 @@ class Link:
         self.section = section
         self.caption = caption
 
-    def title(self):
+    def title(self) -> str:
         ret = str()
         if self.prefix:
             ret += self.prefix + ":"
@@ -24,22 +25,31 @@ class Link:
             ret += "(" + self.suffix + ")"
         return ret
 
-    def link(self):
+    def link(self) -> str:
         ret = Link.title(self)
         if self.section:
             ret += "#" + self.section
         return ret
 
-    def showed_caption(self):
+    def showed_caption(self) -> str:
         return self.caption if self.caption else self.link()
+    
+    def __str__(self) -> str:
+        ret = self.link()
+        if self.caption:
+            ret += '|' + self.caption
+        return ret
+    
+    def __repr__(self) -> str:
+        return '\'' + self.__str__() + '\''
 
 
-def clean_zero_width_spaces(text):
+def clean_zero_width_spaces(text: str) -> str:
     return text.replace("\u200e", "")
 
 
-def findlinks(text):
-    link_pattern = r"(?:[\ _]*([^\[\]]*?)\:)([^\[\]]*?)(?:\(([^\[\]]*?)\))?(?:\#([^\[\]]*?)[\ _]*)?(?:\|[\ _]*([^\[\]]*?)[\ _]*)?"
+def findlinks(text: str) -> typing.List[Link]:
+    link_pattern = r"(?:[\ _]*([^\[\]]*?)\:)?([^\[\]]*?)(?:\(([^\[\]]*?)\))?(?:\#([^\[\]]*?)[\ _]*)?(?:\|[\ _]*([^\[\]]*?)[\ _]*)?"
     link_tuple_list = re.findall(r"(?:\[\[|\{\{[\ _]*(?:coloredlink|dl)[\ _]*\|[^\|]*\|)" + link_pattern + r"\]\]", text)
     # (prefix, core, suffix, section, caption):
     # "[[prefix:core(suffix)#section|caption]]"
@@ -49,12 +59,12 @@ def findlinks(text):
 
 
 def list_disambig_articles(
-        disambig: pywikibot.Page,
-        process: Union[TaskProcess, NoneProcess] = NoneProcess(),
-        article_except: Optional[list] = None,
-        dropout_multi_articles: bool = False,
-        dropout_no_keyword: bool = False
-        ) -> list:
+    disambig: pywikibot.Page,
+    process: typing.Union[TaskProcess, NoneProcess] = NoneProcess(),
+    article_except: typing.List[str] = [],
+    dropout_multi_articles: bool = False,
+    dropout_no_keyword: bool = False
+) -> typing.List[typing.Dict[str, typing.Union[str, typing.Set[str]]]]:
     # print("list_disambig_articles(" + disambig.title() + ")")
     articles = list()
     process.print("==", disambig.title(), "==")
@@ -67,8 +77,10 @@ def list_disambig_articles(
             line_split = line.split("——")
             if len(line_split) < 2:
                 continue
+        # print(line_split)
         article_links = findlinks(line_split[0])
         keyword_links = findlinks(line_split[1])
+        # print(article_links, keyword_links)
         if not article_links \
             or (dropout_multi_articles and len(article_links) > 1) \
             or (dropout_no_keyword and not keyword_links):
@@ -99,8 +111,11 @@ def list_disambig_articles(
 
 
 def list_disambig_articles_main():
-    # list_disambig_articles("Afterglow")
-    pass
+    title = sys.argv[1] if len(sys.argv) > 1 else "Afterglow"
+    site = pywikibot.Site()
+    page = pywikibot.Page(site, title)
+    list_disambig_articles(page, dropout_multi_articles=True, dropout_no_keyword=True)
+    # pass
 
 
 if __name__ == '__main__':

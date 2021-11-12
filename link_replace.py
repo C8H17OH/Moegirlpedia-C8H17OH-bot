@@ -2,7 +2,7 @@ import pywikibot
 import sys
 from disambig_basic import find_link, replace_link
 
-def link_replace(old_title, new_title):
+def link_replace(old_title: str, new_title: str):
     site = pywikibot.Site()
     page = pywikibot.Page(site, old_title)
     for backlink in page.backlinks():

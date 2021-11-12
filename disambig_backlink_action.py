@@ -1,5 +1,6 @@
 import pywikibot
 import json
+from disambig_basic import bot_save
 from disambig_linkshere import replace_link
 
 
@@ -12,9 +13,7 @@ def disambig_backlink_action():
         for (backlink_title, redirect_title, article_title, article_relations) in result_json[disambig_title]:
             backlink = pywikibot.Page(site, backlink_title)
             backlink.text = replace_link(backlink.text, redirect_title, article_title)
-            backlink.save(summary="消歧义：[[" + redirect_title + "]]→[[" + article_title + "]]"
-                + "。本次编辑由机器人进行，如修改有误，请撤销或更正，并[[User_talk:C8H17OH|联系操作者]]。",
-                asynchronous=True, watch="nochange", minor=True, botflag=True)
+            bot_save(backlink, summary="消歧义：[[" + redirect_title + "]]→[[" + article_title + "]]")
     result_file = open("scripts/userscripts/disambig_result.json", mode="w", encoding="UTF-8")
     json.dump(dict(), result_file)
     result_file.close()

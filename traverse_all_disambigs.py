@@ -1,12 +1,12 @@
 import pywikibot
 import json
 import sys
-from disambig_linkshere import disambig_linkshere, NoneProcess
+from disambig_linkshere import disambig_linkshere
 # from list_disambig_articles import list_disambig_articles
 from disambig_task_process import TaskProcess
 
 
-def traverse_all_disambigs_redo(site, disambig, process):
+def traverse_all_disambigs_redo(site: pywikibot.Site, disambig: pywikibot.Page, process: TaskProcess):
     disambig = pywikibot.Page(site, disambig.title())
     except_file = open("scripts/userscripts/disambig_except.json", mode="r", encoding="UTF-8")
     excepts = json.load(except_file)
@@ -15,7 +15,7 @@ def traverse_all_disambigs_redo(site, disambig, process):
     return disambig_linkshere(disambig, process=process, print_procedure=False, do_edit=False, show_manual=False, excepts=excepts)
 
 
-def traverse_all_disambigs(startfrom=None):
+def traverse_all_disambigs(startfrom: str = ""):
     site = pywikibot.Site()
     disambig_category = pywikibot.Category(site, "Category:消歧义页")
     except_file = open("scripts/userscripts/disambig_except.json", mode="r", encoding="UTF-8")
@@ -44,7 +44,7 @@ def traverse_all_disambigs(startfrom=None):
                 break
         process.wait()
     except Exception as e:
-        print("Erorr occurs:", repr(e))
+        print("Error occurs:", repr(e))
         process.wait()
     print("Program Exited.")
     except_file.close()
