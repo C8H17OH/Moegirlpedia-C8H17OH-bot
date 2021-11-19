@@ -1,7 +1,8 @@
 from hashlib import new
+from os import pwrite
 import pywikibot
-import pywikibot.textlib
 import re
+import sys
 from disambig_basic import find_link, replace_link, bot_save
 
 def list_birthday_celebration_description():
@@ -59,5 +60,12 @@ def modify_houbunsha_family_template(startfrom: str = ''):
                     bot_save(article, '文本替换："' + pattern + '" → "' + repl + '"')
                 break
 
+def test_replace_link(title: str, oldlink: str, newlink: str):
+    site = pywikibot.Site()
+    page = pywikibot.Page(site, title)
+    page.text = replace_link(page.text, oldlink, newlink)
+    bot_save(page)
+
 if __name__ == "__main__":
-    modify_houbunsha_family_template()
+    if len(sys.argv) > 1:
+        eval(sys.argv[1])

@@ -22,6 +22,10 @@ def bot_save(page: pywikibot.Page, summary: str = "") -> None:
     page.save(summary=summary, asynchronous=True, watch="nochange", minor=True, botflag=True, tags=["Bot"])
 
 
+def short_link(page: pywikibot.Page) -> str:
+    return page.site.base_url(page.site.article_path + '_?curid=' + str(page.pageid))
+
+
 def link_preproc(link: str) -> str:
     link = link.strip() # 去除首尾空格
     link = re.escape(link) # 正则表达式化
@@ -42,13 +46,28 @@ def find_link(text: str, link: str) -> bool:
     return re.search(pattern, text) != None
 
 
-def replace_link(text: str, oldlink: str, newlink: str) -> str:
-    pattern = r"\[\[[\ _]*" + link_preproc(oldlink) + r"[\ _]*(\#[^\[\]]*?[\ _]*)?(\|[^\[\]]*?[\ _]*)[\ _]*\]\]"
-    repl = r"[[" + newlink + r"\1\2]]"
+def replace_link(text: str, oldlink: str, newlink: str, keep_no_caption: bool = False) -> str:
+    oldlink = link_preproc(oldlink)
+
+    # replace "[[oldlink#section|caption]]" to "[[newlink#section|caption]]"
+    pattern = r"\[\[[ _]*" + oldlink + r"[ _]*(\#[^\[\]]*?[ _]*)?(\|[^\[\]]*?[ _]*)[ _]*\]\]"
+    repl = r"[[" + newlink + r"\1\2]]" # \1 is "#section", \2 is "|caption"
     text = re.sub(pattern, repl, text)
-    pattern = r"\[\[[\ _]*(" + link_preproc(oldlink) + r")[\ _]*(\#[^\[\]]*?)?[\ _]*\]\]"
-    repl = r"[[" + newlink + r"\2|\1]]"
+
+    # if keep_no_caption, then replace "[[oldlink#section]]" to "[[newlink#section]]"
+    # else, use old full title as caption, i.e. replace "[[oldlink#section]]" to "[[newlink#section|oldlink#section]]";
+    pattern = r"\[\[[ _]*(" + oldlink + r"[ _]*(\#[^\[\]]*?)?)[ _]*\]\]"
+    if keep_no_caption:
+        repl = r"[[" + newlink + r"\2]]" # \2 is "#section"
+    else:
+        repl = r"[[" + newlink + r"\2|\1]]" # \1 is "oldlink#section", \2 is "#section"
     text = re.sub(pattern, repl, text)
+
+    # replace "[[File:...|link=<oldlink>]]" (and also "[[Image:...]]") to "[[File:...|link=<newlink>]]"
+    pattern = r"\[\[[ _]*((?:[Ff][Ii][Ll][Ee]|[Ii][Mm][Aa][Gg][Ee])[ _]*:.*?\| *link=)[ _]*" + oldlink + r"[ _]*(\|.*?)?\]\]"
+    repl = r"[[\1" + newlink + r"\2]]"
+    text = re.sub(pattern, repl, text)
+
     return text
 
 
