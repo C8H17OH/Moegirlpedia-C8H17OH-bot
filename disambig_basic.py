@@ -154,7 +154,8 @@ def disambig_linkshere_action(
                 passes = order.split()[1:]
                 if not passes:
                     print(end="Pass which ones? ")
-                    passes = input().split()    
+                    passes = input().split()
+                do_edit = True
                 break
     if do_edit:
         index = 0

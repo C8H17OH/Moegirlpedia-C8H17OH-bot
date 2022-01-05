@@ -41,7 +41,15 @@ def link_replace_main():
     args = parser.parse_args()
     # print(args)
     if args.old_title and args.new_title:
-        link_replace(args.old_title, args.new_title, args.keep_no_caption, args.show_diff, args.auto_submit, not args.userpage, not args.talkpage)
+        link_replace(
+            old_title       = args.old_title,
+            new_title       = args.new_title,
+            keep_no_caption = args.keep_no_caption,
+            show_diff       = args.show_diff,
+            auto_submit     = args.auto_submit,
+            skip_user       = not args.userpage,
+            skip_talk       = not args.talkpage
+        )
 
 if __name__ == "__main__":
     link_replace_main()

@@ -35,18 +35,18 @@ class TaskProcess(threading.Thread, NoneProcess):
         self.redos: queue.Queue[pywikibot.Page] = queue.Queue()
         self.redo_lock = threading.Lock()
 
-    def add(self, task: Task):
+    def add(self, func: typing.Callable, *args, **kwargs):
         self.task_lock.acquire()
-        self.tasks.put(task)
+        self.tasks.put(Task(func, *args, **kwargs))
         self.task_lock.release()
 
     def print(self, *args, **kwargs):
         process_print("print:", args, kwargs)
-        self.add(Task(print, *args, **kwargs))
+        self.add(print, *args, **kwargs)
 
     def action(self, *args, **kwargs):
         process_print("action:", args, kwargs)
-        self.add(Task(disambig_linkshere_action, *args, **kwargs))
+        self.add(disambig_linkshere_action, *args, **kwargs)
 
     def run(self):
         process_print("before running")

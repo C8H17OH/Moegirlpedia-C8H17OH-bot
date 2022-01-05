@@ -46,6 +46,8 @@ def disambig_linkshere(
                 return False
     else:
         articles = list_disambig_articles(disambig, process=process, article_except=article_except, dropout_multi_articles=True, dropout_no_keyword=True)
+        if not articles:
+            return "none"
     
     # print("articles =", articles)
     
@@ -114,6 +116,8 @@ def disambig_linkshere(
     for (backlink, redirect_title, article_link, article_relations) in autos:
         index += 1
         process.print(index, backlink.title(), redirect_title, article_link, article_relations, backlink.full_url(), sep=", ")
+        newtext = replace_link(backlink.text, redirect_title, article_link)
+        process.add(pywikibot.showDiff, backlink.text, newtext)
 
     # if asynchronous:
         # result_file = open("scripts/userscripts/disambig_result.json", mode="r", encoding="UTF-8")

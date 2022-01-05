@@ -26,7 +26,7 @@ class Link:
         return ret
 
     def link(self) -> str:
-        ret = Link.title(self)
+        ret = self.title()
         if self.section:
             ret += "#" + self.section
         return ret
@@ -50,10 +50,10 @@ def clean_zero_width_spaces(text: str) -> str:
 
 def findlinks(text: str) -> typing.List[Link]:
     link_pattern = r"(?:[\ _]*([^\[\]]*?)\:)?([^\[\]]*?)(?:\(([^\[\]]*?)\))?(?:\#([^\[\]]*?)[\ _]*)?(?:\|[\ _]*([^\[\]]*?)[\ _]*)?"
-    link_tuple_list = re.findall(r"(?:\[\[|\{\{[\ _]*(?:coloredlink|dl)[\ _]*\|[^\|]*\|)" + link_pattern + r"\]\]", text)
+    link_tuple_list = re.findall(r"(?:\[\[|\{\{[\ _]*(?:coloredlink\|.*?|dl)[\ _]*\|[^\|]*\|)" + link_pattern + r"\]\]", text)
     # (prefix, core, suffix, section, caption):
     # "[[prefix:core(suffix)#section|caption]]"
-    # "{{coloredlink|prefix:core(suffix)#section|caption}}"
+    # "{{coloredlink|color|prefix:core(suffix)#section|caption}}"
     # "{{dl|prefix:core(suffix)#section}}"
     return [Link(tuple(map(clean_zero_width_spaces, link_tuple))) for link_tuple in link_tuple_list]
 
