@@ -16,6 +16,7 @@ class Link:
         self.section = section
         self.caption = caption
 
+    @property
     def title(self) -> str:
         ret = str()
         if self.prefix:
@@ -25,19 +26,21 @@ class Link:
             ret += "(" + self.suffix + ")"
         return ret
 
+    @property
     def link(self) -> str:
-        ret = self.title()
+        ret = self.title
         if self.section:
             ret += "#" + self.section
         return ret
 
+    @property
     def showed_caption(self) -> str:
-        return self.caption if self.caption else self.link()
+        return self.caption if self.caption else self.link
     
     def __str__(self) -> str:
-        ret = self.link()
-        if self.caption:
-            ret += '|' + self.caption
+        ret = self.link
+        # if self.caption:
+        #     ret += '|' + self.caption
         return ret
     
     def __repr__(self) -> str:
@@ -48,9 +51,9 @@ def clean_zero_width_spaces(text: str) -> str:
     return text.replace("\u200e", "")
 
 
+LINK_PATTERN = r"(?:[\ _]*([^\[\]\|]*?)\:)?([^\[\]\|]*?)(?:\(([^\[\]\|]*?)\))?(?:\#([^\[\]\|]*?)[\ _]*)?(?:\|[\ _]*([^\[\]]*?)[\ _]*)?"
 def findlinks(text: str) -> typing.List[Link]:
-    link_pattern = r"(?:[\ _]*([^\[\]]*?)\:)?([^\[\]]*?)(?:\(([^\[\]]*?)\))?(?:\#([^\[\]]*?)[\ _]*)?(?:\|[\ _]*([^\[\]]*?)[\ _]*)?"
-    link_tuple_list = re.findall(r"(?:\[\[|\{\{[\ _]*(?:coloredlink\|.*?|dl)[\ _]*\|[^\|]*\|)" + link_pattern + r"\]\]", text)
+    link_tuple_list = re.findall(r"(?:\[\[|\{\{[\ _]*(?:coloredlink\|.*?|dl)[\ _]*\|[^\|]*\|)" + LINK_PATTERN + r"\]\]", text)
     # (prefix, core, suffix, section, caption):
     # "[[prefix:core(suffix)#section|caption]]"
     # "{{coloredlink|color|prefix:core(suffix)#section|caption}}"
@@ -65,7 +68,7 @@ def list_disambig_articles(
     dropout_multi_articles: bool = False,
     dropout_no_keyword: bool = False
 ) -> typing.List[typing.Dict[str, typing.Union[str, typing.Set[str]]]]:
-    # print("list_disambig_articles(" + disambig.title() + ")")
+    # print("list_disambig_articles(" + disambig.title + ")")
     articles = list()
     process.print("==", disambig.title(), "==")
     process.print(disambig.full_url())
@@ -82,16 +85,15 @@ def list_disambig_articles(
         keyword_links = findlinks(line_split[1])
         # print(article_links, keyword_links)
         if not article_links \
-            or (dropout_multi_articles and len(article_links) > 1) \
-            or (dropout_no_keyword and not keyword_links):
+            or (dropout_multi_articles and len(article_links) > 1):
             continue
         process.print(line)
         for article_link in article_links:
-            if article_except and article_link.title() in article_except:
+            if article_except and article_link.title in article_except:
                 continue
             article = article_link.__dict__
-            article["title"] = article_link.title()
-            article["link"] = article_link.link()
+            article["title"] = article_link.title
+            article["link"] = article_link.link
             keywords = set()
             if article_link.prefix and article_link.prefix not in (
                 "Template", "模板", "Category", "分类", "User", "用户", "zhwiki"):
@@ -99,9 +101,11 @@ def list_disambig_articles(
             elif article_link.suffix:
                 keywords.add(article_link.suffix)
             for keyword_link in keyword_links:
-                keywords.add(keyword_link.title())
+                keywords.add(keyword_link.title)
                 if keyword_link.caption:
                     keywords.add(keyword_link.caption)
+            if dropout_no_keyword and not keywords:
+                continue
             article["keywords"] = keywords
             articles.append(article)
     # for article in articles:

@@ -65,7 +65,8 @@ def disambig_linkshere(
         if print_procedure:
             process.print("====", redirect.title(), "(" + str(len(list(redirect.backlinks(filter_redirects=False)))) + ") ====")
         # for linksto in site.search("linksto:" + disambig.title()):
-        for backlink in redirect.backlinks(filter_redirects=False):
+        for backlink in redirect.backlinks(follow_redirects=False, filter_redirects=False):
+            backlink: pywikibot.Page
             # print("backlink = " + backlink.title())
             if "Talk" in backlink.namespace() or "talk" in backlink.namespace():
                 continue

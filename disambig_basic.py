@@ -8,6 +8,15 @@ t2s = opencc.OpenCC("t2s.json")
 
 
 class NoneProcess:
+    def start(self):
+        pass
+
+    def wait(self):
+        pass
+
+    def add(self, func: typing.Callable, *args, **kwargs):
+        return func(*args, **kwargs)
+
     def print(self, *args, **kwargs):
         return print(*args, **kwargs)
     
@@ -18,12 +27,13 @@ class NoneProcess:
 def bot_save(page: pywikibot.Page, summary: str = "") -> None:
     if summary:
         summary += "。"
-    summary += "本次编辑由机器人进行，如修改有误，请撤销或更正，并[[User_talk:C8H17OH|联系操作者]]。"
-    page.save(summary=summary, asynchronous=True, watch="nochange", minor=True, botflag=True, tags=["Bot"])
+    prefix = '' if page.site.code == 'zh' else 'zhmoe:'
+    summary += "本次编辑由机器人进行，如修改有误，请撤销或更正，并[[" + prefix + "User_talk:C8H17OH|联系操作者]]。"
+    page.save(summary=summary, asynchronous=True, watch="nochange", minor=True, botflag=True, tags={"Bot"})
 
 
 def short_link(page: pywikibot.Page) -> str:
-    return page.site.base_url(page.site.article_path + '_?curid=' + str(page.pageid))
+    return page.site.base_url(page.site.articlepath + '_?curid=' + str(page.pageid))
 
 
 def link_preproc(link: str) -> str:
@@ -156,6 +166,7 @@ def disambig_linkshere_action(
                     print(end="Pass which ones? ")
                     passes = input().split()
                 do_edit = True
+                passes = [int(i) for i in passes]
                 break
     if do_edit:
         index = 0
@@ -163,12 +174,12 @@ def disambig_linkshere_action(
             index += 1
             if index in passes:
                 continue
-            backlink.text = replace_link(backlink.text, redirect_title, article_link)
+            backlink.text = replace_link(backlink.get(force=True), redirect_title, article_link)
             bot_save(backlink, summary="消歧义：[[" + redirect_title + "]]→[[" + article_link + "]]")
     if show_manual:
         print("====== manuals:", disambig.title(), "======")
-        for manual in manuals:
-            print(manual.title(), manual.full_url())
+        for (backlink, redirect_title, article_link, article_relations) in manuals:
+            print(backlink.title(), backlink.full_url())
     return "done" if do_edit else "deny"
 
 

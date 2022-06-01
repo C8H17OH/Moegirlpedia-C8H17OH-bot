@@ -1,12 +1,9 @@
-import typing
 import pywikibot
+import typing
 import queue
 import threading
 import time
-from disambig_basic import disambig_linkshere_action
-import pywikibot
-from scripts.userscripts.disambig_basic import NoneProcess
-from tests import pwb
+from disambig_basic import disambig_linkshere_action, NoneProcess
 
 
 class Task:
@@ -59,7 +56,7 @@ class TaskProcess(threading.Thread, NoneProcess):
                 ret = task.call()
                 if ret == "redo":
                     self.redo_lock.acquire()
-                    self.redos.put(task.kwargs["disambig"] if task.kwargs.get("disambig") else task.args[0])
+                    self.redos.put(task.kwargs.get("disambig", task.args[0]))
                     self.redo_lock.release()
                 elif ret == "quit":
                     self.running = False

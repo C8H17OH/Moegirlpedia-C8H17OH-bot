@@ -1,2 +1,10 @@
-__pycache__/
+*
+*.*
+!*.py
+!*.json
+!.gitignore
+!README.md
+!families/
 __init__.py
+user-config.py
+user-password.py

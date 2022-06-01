@@ -1,6 +1,7 @@
 import pywikibot
 import json
 import sys
+import traceback
 from disambig_linkshere import disambig_linkshere
 # from list_disambig_articles import list_disambig_articles
 from disambig_task_process import TaskProcess
@@ -8,7 +9,7 @@ from disambig_task_process import TaskProcess
 
 def traverse_all_disambigs_redo(site: pywikibot.Site, disambig: pywikibot.Page, process: TaskProcess):
     disambig = pywikibot.Page(site, disambig.title())
-    except_file = open("scripts/userscripts/disambig_except.json", mode="r", encoding="UTF-8")
+    except_file = open("disambig_except.json", mode="r", encoding="UTF-8")
     excepts = json.load(except_file)
     if disambig.title() in excepts["DISAMBIG_EXCEPT"]:
         return
@@ -16,15 +17,17 @@ def traverse_all_disambigs_redo(site: pywikibot.Site, disambig: pywikibot.Page, 
 
 
 def traverse_all_disambigs(startfrom: str = ""):
-    site = pywikibot.Site()
+    site: pywikibot.APISite = pywikibot.Site()
+    site.login()
     disambig_category = pywikibot.Category(site, "Category:消歧义页")
-    except_file = open("scripts/userscripts/disambig_except.json", mode="r", encoding="UTF-8")
+    except_file = open("disambig_except.json", mode="r", encoding="UTF-8")
     excepts = json.load(except_file)
     started = False if startfrom else True
     try:
         process = TaskProcess()
         process.start()
         for disambig in disambig_category.members():
+            disambig: pywikibot.Page
             # print("disambig.title() = " + disambig.title())
             if not started and disambig.title() != startfrom:
                 continue
@@ -43,9 +46,12 @@ def traverse_all_disambigs(startfrom: str = ""):
                 print("Process No Longer Running.")
                 break
         process.wait()
-    except Exception as e:
-        print("Error occurs:", repr(e))
+    except:
+        print("Error occurs:")
+        traceback.print_exc()
         process.wait()
+    else:
+        print("Program successfully executed.")
     print("Program Exited.")
     except_file.close()
 
@@ -55,7 +61,7 @@ def traverse_all_disambigs_main():
         traverse_all_disambigs()
     elif len(sys.argv) == 2:
         traverse_all_disambigs(sys.argv[1])
-    # next time from 暗影
+    # next time from 曲奇
 
 
 if __name__ == '__main__':

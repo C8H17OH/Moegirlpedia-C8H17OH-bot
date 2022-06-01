@@ -14,6 +14,7 @@ def link_replace(
     site = pywikibot.Site()
     page = pywikibot.Page(site, old_title)
     for backlink in page.backlinks():
+        backlink: pywikibot.Page
         if skip_user and backlink.namespace() == 'User:':
             continue
         if skip_talk and backlink.namespace() % 2 == 1:
