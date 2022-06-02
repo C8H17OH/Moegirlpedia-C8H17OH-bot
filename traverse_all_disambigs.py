@@ -42,9 +42,9 @@ def traverse_all_disambigs(startfrom: str = ""):
             while not process.no_redo():
                 for disambig in process.gen_redo():
                     traverse_all_disambigs_redo(site, disambig, process)
-            if not process.running:
-                print("Process No Longer Running.")
-                break
+            # if process.quited:
+            #     print("Process No Longer Running.")
+            #     break
         process.wait()
     except:
         print("Error occurs:")

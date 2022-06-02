@@ -3,6 +3,7 @@ import typing
 import queue
 import threading
 import time
+import itertools
 from disambig_basic import disambig_linkshere_action, NoneProcess
 
 
@@ -14,6 +15,9 @@ class Task:
     
     def call(self):
         return self.func(*self.args, **self.kwargs)
+
+    def __str__(self):
+        return self.func.__name__ + '(' + ', '.join(itertools.chain((repr(a) for a in self.args), (k + '=' + repr(w) for k, w in self.kwargs))) + ')'
 
 
 def process_print(*args, **kwargs):
@@ -27,14 +31,15 @@ class TaskProcess(threading.Thread, NoneProcess):
         threading.Thread.__init__(self)
         self.tasks: queue.Queue[Task] = queue.Queue()
         self.task_lock: threading.Lock = threading.Lock()
-        self.running: bool = True
-        self.over: bool = False
+        self.waiting: bool = False
         self.redos: queue.Queue[pywikibot.Page] = queue.Queue()
         self.redo_lock = threading.Lock()
 
     def add(self, func: typing.Callable, *args, **kwargs):
+        task = Task(func, *args, **kwargs)
+        process_print('add:', task)
         self.task_lock.acquire()
-        self.tasks.put(Task(func, *args, **kwargs))
+        self.tasks.put(task)
         self.task_lock.release()
 
     def print(self, *args, **kwargs):
@@ -47,27 +52,32 @@ class TaskProcess(threading.Thread, NoneProcess):
 
     def run(self):
         process_print("before running")
-        while self.running and not self.over:
+        empty: bool = True
+        quited: bool = False
+        while (not empty or not self.waiting) and not quited:
             process_print("running")
             self.task_lock.acquire()
             if not self.tasks.empty():
+                empty = True
                 task = self.tasks.get()
                 self.task_lock.release()
+                process_print('call:', task)
                 ret = task.call()
                 if ret == "redo":
                     self.redo_lock.acquire()
                     self.redos.put(task.kwargs.get("disambig", task.args[0]))
                     self.redo_lock.release()
                 elif ret == "quit":
-                    self.running = False
-                    self.wait()
+                    quited = True
                     exit(0)
             else:
+                empty = False
                 self.task_lock.release()
                 time.sleep(1)
 
     def wait(self):
-        self.over = True
+        process_print('wait')
+        self.waiting = True
         self.join()
     
     def no_redo(self) -> bool:
