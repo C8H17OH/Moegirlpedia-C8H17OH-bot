@@ -1,6 +1,6 @@
 import pywikibot, pywikibot.site
 import argparse
-from disambig_basic import find_link, replace_link, bot_save, short_link
+from disambig_basic import find_link, replace_link, bot_save, short_url
 
 def link_replace(
     old_title: str,
@@ -20,7 +20,7 @@ def link_replace(
         if skip_talk and backlink.namespace() % 2 == 1:
             continue
         if find_link(backlink.text, old_title):
-            print(backlink.title(), short_link(backlink), sep=' | ')
+            print(backlink.title(), short_url(backlink), sep=' | ')
             if show_diff or auto_submit:
                 newtext = replace_link(backlink.text, old_title, new_title, keep_no_caption)
             if show_diff:

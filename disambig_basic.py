@@ -32,8 +32,8 @@ def bot_save(page: pywikibot.Page, summary: str = "") -> None:
     page.save(summary=summary, asynchronous=True, watch="nochange", minor=True, botflag=True, tags={"Bot"})
 
 
-def short_link(page: pywikibot.Page) -> str:
-    return page.site.base_url(page.site.articlepath + '_?curid=' + str(page.pageid))
+def short_url(page: pywikibot.Page) -> str:
+    return page.site.base_url(page.site.articlepath.format('_?curid=' + str(page.pageid)))
 
 
 def link_preproc(link: str) -> str:
@@ -50,6 +50,9 @@ def link_preproc(link: str) -> str:
             ret += char
     return ret
 
+def template_and_redirects_regex(page: pywikibot.Page) -> str:
+    return link_preproc(page.title()) + ''.join(('|' + link_preproc(redirect.title(with_ns=False))) for redirect in page.backlinks(filter_redirects=True))
+
 
 def find_link(text: str, link: str) -> bool:
     pattern = r"\[\[[\ _]*" + link_preproc(link) + r"[\ _]*(\#[^\[\]]*?[\ _]*)?(\|.*?[\ _]*)?[\ _]*\]\]"
@@ -58,6 +61,11 @@ def find_link(text: str, link: str) -> bool:
 
 def replace_link(text: str, oldlink: str, newlink: str, keep_no_caption: bool = False) -> str:
     oldlink = link_preproc(oldlink)
+
+    # replace "[[oldlink|newlink]]" to "[[newlink]]"
+    pattern = r"\[\[[ _]*" + oldlink + r"[ _]*\|[ _]*" + link_preproc(newlink) + r"[ _]*\]\]"
+    repl = r"[[" + newlink + r"]]"
+    text = re.sub(pattern, repl, text)
 
     # replace "[[oldlink#section|caption]]" to "[[newlink#section|caption]]"
     pattern = r"\[\[[ _]*" + oldlink + r"[ _]*(\#[^\[\]]*?[ _]*)?(\|[^\[\]]*?[ _]*)[ _]*\]\]"
@@ -75,10 +83,15 @@ def replace_link(text: str, oldlink: str, newlink: str, keep_no_caption: bool = 
 
     # replace "[[File:...|link=<oldlink>]]" (and also "[[Image:...]]") to "[[File:...|link=<newlink>]]"
     pattern = r"\[\[[ _]*((?:[Ff][Ii][Ll][Ee]|[Ii][Mm][Aa][Gg][Ee])[ _]*:.*?\| *link=)[ _]*" + oldlink + r"[ _]*(\|.*?)?\]\]"
-    repl = r"[[\1" + newlink + r"\2]]"
+    repl = r"[[\g<1>" + newlink + r"\2]]"
     text = re.sub(pattern, repl, text)
 
     return text
+
+
+def remove_link(text: str, oldlink: str) -> str:
+    pattern = r"\[\[[ _]*" + link_preproc(oldlink) + r"[ _]*(\#[^\[\]]*?[ _]*)?(\|[^\[\]]*?[ _]*)?[ _]*\]\]"
+    return re.sub(pattern, "", text)
 
 
 # def original(s):

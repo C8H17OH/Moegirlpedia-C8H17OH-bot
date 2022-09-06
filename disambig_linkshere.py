@@ -157,7 +157,7 @@ def disambig_linkshere_main():
 
     site = pywikibot.Site()
     if len(sys.argv) == 2:
-        excepts_file = open("scripts/userscripts/disambig_except.json", mode="r", encoding="UTF-8")
+        excepts_file = open("disambig_except.json", mode="r", encoding="UTF-8")
         excepts = json.load(excepts_file)
         disambig = pywikibot.Page(site, sys.argv[1])
         disambig_linkshere(disambig, excepts=excepts, do_edit=False, show_manual=True)

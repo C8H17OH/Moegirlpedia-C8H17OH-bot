@@ -7,7 +7,7 @@ import sys, os
 import Disambig
 
 
-filepath = 'scripts/userscripts/disambig_database.json'
+filepath = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'disambig_database.json')
 
 async def empty_coroutine():
     pass
@@ -28,7 +28,7 @@ async def update_disambig_terms(
     disamb_list: tp.Iterable[tp.Union[str, pwb.Page]] = None,
     force_flush_terms: bool = False
 ):
-    site = pwb.Site()
+    site: pwb.APISite = pwb.Site()
     db: dict[str, dict[str]]
     with open(filepath, mode='r', encoding='utf-8') as f:
         db = json.load(f)
@@ -95,4 +95,4 @@ async def update_disambig_backlinks(
 
 
 if __name__ == '__main__':
-    asyncio.run(update_disambig_backlinks(disamb_list=['光']))
+    asyncio.run(update_disambig_backlinks())

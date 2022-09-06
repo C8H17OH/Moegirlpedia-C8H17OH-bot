@@ -1,8 +1,9 @@
 import pywikibot as pwb
-import pywikibot.site as pwb_site
 import urllib.parse as urlp
+import itertools
 import traceback
 import argparse
+import typing
 from disambig_basic import bot_save
 from disambig_task_process import TaskProcess, NoneProcess
 
@@ -12,10 +13,10 @@ site.login()
 BILIBILI_DOMAINS = ('bilibili', 'b23.tv')
 USERPATH_QUERYARGS = ('from', 'seid', 'spm_id_from', 'from_spmid', 'referfrom', 'bilifrom',
     'share_source', 'share_medium', 'share_plat', 'share_session_id', 'share_tag', 'share_times',
-    'timestamp', 'bbid', 'ts', 'from_source', 'broadcast_type', 'is_room_feed')
+    'timestamp', 'bbid', 'ts', 'from_source', 'broadcast_type', 'is_room_feed', 'vd_source')
 USERPATH_QUERYARGS_EQUAL = [s + '=' if len(s) < 4 else s for s in USERPATH_QUERYARGS]
 
-def remove_bililink_userpath_action(page: pwb.Page):
+def remove_bililink_userpath_action(page: pwb.Page, auto_submit: bool = False):
     newtext = page.text
     removed_queryargs = set()
     for link in page.extlinks():
@@ -37,6 +38,10 @@ def remove_bililink_userpath_action(page: pwb.Page):
     print(page.full_url())
     pwb.showDiff(page.text, newtext)
     print(removed_queryargs)
+    if auto_submit:
+        page.text = newtext
+        bot_save(page, '清理B站链接参数：' + '，'.join(a for a in removed_queryargs))
+        return
     while True:
         print(end='Save? ([Y]es / [N]o / [Q]uit): ')
         cmd = input()
@@ -50,21 +55,34 @@ def remove_bililink_userpath_action(page: pwb.Page):
             return "quit"
 
 def remove_bililink_userpath(
-    pages: list[str] | None = None,
-    start: str = '!',
-    namespace: int | str | pwb_site.Namespace = 0,
-    asynchronous: bool = True
+    pages: typing.Iterable[str | pwb.Page] | None = None,
+    start_from: str | None = None,
+    asynchronous: bool = True,
+    auto_submit: bool = False
 ):
+    skipping = bool(start_from)
+    if pages:
+        pages = (page if isinstance(page, pwb.Page) else pwb.Page(site, page) for page in pages)
+    else:
+        pages = itertools.chain(
+            *(site.exturlusage(url='*.bilibili.com', protocol=prot, namespaces=['', 'Template', 'Category']) for prot in ('http', 'https'))
+        )
     try:
         process = TaskProcess() if asynchronous else NoneProcess()
         print(process)
         process.start()
-        for page in (pwb.Page(site, p) for p in pages) if pages else site.allpages(start=start, namespace=namespace, filterredir=False):
+        for page in pages:
             page: pwb.Page
+            if skipping:
+                if page.title() == start_from:
+                    skipping = False
+                else:
+                    continue
             process.add(print, page.title())
             for link in page.extlinks():
                 if any(s in link for s in BILIBILI_DOMAINS) and any(s in link for s in USERPATH_QUERYARGS_EQUAL):
-                    process.add(remove_bililink_userpath_action, page)
+                    # print('(debug) link:', link)
+                    process.add(remove_bililink_userpath_action, page, auto_submit=auto_submit)
                     break
         process.wait()
     except:
@@ -79,8 +97,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('pages', nargs='*')
     parser.add_argument('-s', '--start')
-    parser.add_argument('-n', '--ns')
     parser.add_argument('-c', '--sync', action='store_true')
+    parser.add_argument('-a', '--auto', action='store_true')
     args = parser.parse_args()
     print(args)
-    remove_bililink_userpath(pages=args.pages, start=args.start, namespace=args.ns, asynchronous=not args.sync)
+    remove_bililink_userpath(pages=args.pages, start_from=args.start, asynchronous=not args.sync, auto_submit=args.auto)

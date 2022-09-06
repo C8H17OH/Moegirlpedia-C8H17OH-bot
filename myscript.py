@@ -1,9 +1,14 @@
-import pywikibot, pywikibot.textlib
+import pywikibot, pywikibot.textlib, pywikibot.page
+import mwparserfromhell as mw
 import re
+import difflib
 import sys, traceback
+import json
+import datetime
 import pprint
-import typing, itertools
-from disambig_basic import find_link, replace_link, bot_save, link_preproc
+import typing
+import itertools
+from disambig_basic import find_link, replace_link, bot_save, link_preproc, template_and_redirects_regex, short_url
 from list_disambig_articles import findlinks
 
 site: pywikibot.APISite = pywikibot.Site()
@@ -108,7 +113,7 @@ def search_template_with_parameter(title: str, parameter: str):
     for embed in page.embeddedin():
         embed: pywikibot.Page
         result = []
-        print(repr(embed.title()), end=': [', flush=True)
+        print(embed.title(), end=': [', flush=True)
         for (template, params) in pywikibot.textlib.extract_templates_and_params(text=embed.text, remove_disabled_parts=True, strip=True):
             template: str
             params: pywikibot.textlib.OrderedDict
@@ -137,6 +142,147 @@ def search_template_with_parameter(title: str, parameter: str):
         print(title_res)
         count += len(title_res[1])
     print('Total:', len(results), 'pages,', count, 'uses')
+
+def traverse_template_usages(title: str):
+    # json format: {
+    #   embed_page_1: [
+    #       (used_template_name, {
+    #           key1: value1,
+    #           key2: value2,
+    #           ...
+    #       }),
+    #       (used_template_name, {
+    #           key1: value1,
+    #           key2: value2,
+    #           ...
+    #       }),
+    #       ...
+    #   ],
+    #   embed_page_2: [...],
+    #   ...
+    # }
+    filename = 'Usages of Template ' + title + '.json'
+    results = {}
+    # try:
+    #     with open(filename, mode='r', encoding='utf-8') as f:
+    #         results = json.load(f)
+    # except:
+    #     pass
+    page = pywikibot.Page(site, title, ns='Template')
+    redirects = link_preproc(title) + ''.join(('|' + link_preproc(redirect.title(with_ns=False))) for redirect in page.backlinks(filter_redirects=True))
+    count = 0
+    for embed in page.embeddedin():
+        embed: pywikibot.Page
+        result = []
+        print(count, embed.title())
+        for (template, params) in pywikibot.textlib.extract_templates_and_params(text=embed.text, remove_disabled_parts=True, strip=True):
+            template: str
+            params: pywikibot.textlib.OrderedDict
+            if re.fullmatch(redirects, template):
+                print((template, params))
+                result.append((template, params))
+        if result:
+            results[embed.title()] = result
+        count += 1
+    print('========')
+    count = 0
+    for title_res in results:
+        print(title_res)
+        count += len(results[title_res])
+    print('Total:', len(results), 'pages,', count, 'uses')
+    result['_'] = {'template': title, 'pages': len(results), 'uses': count, 'access_time': datetime.datetime.now().isoformat()}
+    with open(filename, mode='w', encoding='utf-8') as f:
+        json.dump(results, f, indent=4, ensure_ascii=False)
+
+
+def search_in_revisions(title: str, keyword: str = '', skipSameUser: bool = True):
+    page = pywikibot.Page(site, title)
+    rev: pywikibot.page.Revision = None
+    for oldrev in page.revisions(content=True):
+        oldrev: pywikibot.page.Revision
+        if not rev:
+            rev = oldrev
+            continue
+        if skipSameUser and oldrev.userid == rev.userid:
+            continue
+        print((rev.revid, oldrev.revid, rev.user, rev.timestamp, site.base_url('_?diff={}&oldid={}'.format(rev.revid, oldrev.revid))))
+        a: str = oldrev.text
+        b: str = rev.text
+        s = difflib.SequenceMatcher(None, a, b)
+        for tag, alo, ahi, blo, bhi in s.get_opcodes():
+            if (tag == 'insert' and keyword in b[blo:bhi]) \
+                or (tag == 'delete' and keyword in a[alo:ahi]) \
+                or (tag == 'replace' and (keyword in a[alo:ahi] or keyword in b[blo:bhi])):
+                pywikibot.showDiff(a, b)
+                input()
+                break
+        rev = oldrev
+
+
+def upload_and_replace_img_tags(title: str):
+    def check_wikicode(code: mw.wikicode.Wikicode | None):
+        if code is None:
+            return
+        for node in code.nodes:
+            node: mw.nodes.Node
+            if isinstance(node, mw.nodes.Text):
+                continue
+            elif isinstance(node, mw.nodes.Argument):
+                # yield from check_wikicode(node.name)
+                yield from check_wikicode(node.default)
+            elif isinstance(node, mw.nodes.Comment):
+                continue
+            elif isinstance(node, mw.nodes.ExternalLink):
+                # yield from check_wikicode(node.url)
+                yield from check_wikicode(node.title)
+            elif isinstance(node, mw.nodes.Heading):
+                yield from check_wikicode(node.title)
+            elif isinstance(node, mw.nodes.HTMLEntity):
+                continue
+            elif isinstance(node, mw.nodes.Tag):
+                if str(node.tag).lower() == 'img':
+                    # print(node)
+                    yield node
+                # yield from check_wikicode(node.tag)
+                yield from check_wikicode(node.contents)
+            elif isinstance(node, mw.nodes.Template):
+                # yield from check_wikicode(node.name)
+                for param in node.params:
+                    param: mw.nodes.extras.Parameter
+                    # yield from check_wikicode(param.name)
+                    yield from check_wikicode(param.value)
+            elif isinstance(node, mw.nodes.Wikilink):
+                # yield from check_wikicode(node.title)
+                yield from check_wikicode(node.text)
+
+    page = pywikibot.Page(site, title)
+    for node in check_wikicode(mw.parse(page.text)):
+        for attr in node.attributes:
+            attr: mw.nodes.extras.Attribute
+            if str(attr.name).lower() != 'src':
+                continue
+            src = attr.value.nodes[0]
+            if not isinstance(src, mw.nodes.Text):
+                continue
+            print(src.value)
+
+
+def fix_taiwan_isbn_group(start: str = '!'):
+    PAIRS = (('978-9-57', '978-957'), ('978-9-86', '978-986'), ('978-6-26', '978-626'))
+    for page in set(itertools.chain(*(site.search(s[0]) for s in PAIRS))):
+        page: pywikibot.Page
+        if page.isTalkPage():
+            continue
+        repl = [s for s in PAIRS if s[0] in page.text]
+        print((page.title(), short_url(page), repl))
+        if not repl:
+            continue
+        newtext = page.text
+        for s in repl:
+            newtext = newtext.replace(s[0] + '-', s[1] + '-').replace(s[0], s[1] + '-')
+        # pywikibot.showDiff(page.text, newtext)
+        page.text = newtext
+        bot_save(page, '修正ISBN区域代码分段：' + '，'.join(s[0] + '→' + s[1] for s in repl))
 
 
 def bot_delete(page: pywikibot.Page, reason: str, requested: bool = False):
@@ -177,27 +323,6 @@ def delete_files(files: str, reason: str = '不再使用', requested: bool = Fal
         print(page.title())
         bot_delete(page, reason, requested)
 
-def remove_spm_id_in_bililink(start: str = '!'):
-    for page in site.allpages(start=start, filterredir=False):
-        page: pywikibot.Page
-        print(page.title())
-        for link in page.extlinks():
-            if any(s in link for s in ('bilibili.com', 'b23.tv')) and any(s in link for s in ('from=search', 'seid', 'spm_id_from')):
-                newtext = re.sub(r'((?:bilibili\.com|b23\.tv)/.*?)([\?&](from=search|seid=\d+|(spm_id_from|from_spmid)=\d+\.\d+\.[^\s\]\?&<\|]*))+', r'\1', page.text)
-                print(page.full_url())
-                pywikibot.showDiff(page.text, newtext)
-                while True:
-                    print(end='Save? ([Y]es / [N]o / [Q]uit): ')
-                    cmd = input()
-                    if cmd == 'y' or cmd == 'Y':
-                        page.text = newtext
-                        bot_save(page, '删除B站链接中的“spm_id_from”等无用GET参数')
-                        break
-                    elif cmd == 'n' or cmd == 'N':
-                        break
-                    elif cmd == 'q' or cmd == 'Q':
-                        return "quit"
-                break
 
 def test():
     tl = pywikibot.Page(site, 'LoveLive人物信息', ns='Template')
