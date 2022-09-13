@@ -23,6 +23,12 @@ class NoneProcess:
     def action(self, *args, **kwargs):
         return disambig_linkshere_action(*args, **kwargs)
 
+    def gen_redo(self, *args, **kwargs):
+        return []
+
+    def no_redo(self, *args, **kwargs):
+        return True
+
 
 def bot_save(page: pywikibot.Page, summary: str = "") -> None:
     if summary:

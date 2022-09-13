@@ -5,6 +5,7 @@ import traceback
 from disambig_linkshere import disambig_linkshere
 # from list_disambig_articles import list_disambig_articles
 from disambig_task_process import TaskProcess
+from disambig_basic import NoneProcess
 
 
 def traverse_all_disambigs_redo(site: pywikibot.Site, disambig: pywikibot.Page, process: TaskProcess):

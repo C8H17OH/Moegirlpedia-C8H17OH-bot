@@ -1,4 +1,6 @@
 import pywikibot as pwb
+import pywikibot.site
+pwb.site = pywikibot.site
 import urllib.parse as urlp
 import itertools
 import traceback
@@ -13,7 +15,8 @@ site.login()
 BILIBILI_DOMAINS = ('bilibili', 'b23.tv')
 USERPATH_QUERYARGS = ('from', 'seid', 'spm_id_from', 'from_spmid', 'referfrom', 'bilifrom',
     'share_source', 'share_medium', 'share_plat', 'share_session_id', 'share_tag', 'share_times',
-    'timestamp', 'bbid', 'ts', 'from_source', 'broadcast_type', 'is_room_feed', 'vd_source')
+    'timestamp', 'bbid', 'ts', 'from_source', 'broadcast_type', 'is_room_feed', 'vd_source',
+    'unique_k')
 USERPATH_QUERYARGS_EQUAL = [s + '=' if len(s) < 4 else s for s in USERPATH_QUERYARGS]
 
 def remove_bililink_userpath_action(page: pwb.Page, auto_submit: bool = False):
@@ -36,6 +39,8 @@ def remove_bililink_userpath_action(page: pwb.Page, auto_submit: bool = False):
                 newlink = urlp.urlunparse((res.scheme, res.netloc, res.path, res.params, newquery, res.fragment))
                 newtext = newtext.replace(link, newlink).replace(urlp.unquote(link), newlink)
     print(page.full_url())
+    if page.text == newtext:
+        return
     pwb.showDiff(page.text, newtext)
     print(removed_queryargs)
     if auto_submit:
@@ -58,15 +63,20 @@ def remove_bililink_userpath(
     pages: typing.Iterable[str | pwb.Page] | None = None,
     start_from: str | None = None,
     asynchronous: bool = True,
-    auto_submit: bool = False
+    auto_submit: bool = False,
+    namespaces: typing.Iterable[int | str | pwb.site.Namespace] | None = None
 ):
+    if namespaces is None:
+        namespaces = ('Template', '', 'Category')
     skipping = bool(start_from)
     if pages:
         pages = (page if isinstance(page, pwb.Page) else pwb.Page(site, page) for page in pages)
     else:
-        pages = itertools.chain(
-            *(site.exturlusage(url='*.bilibili.com', protocol=prot, namespaces=['', 'Template', 'Category']) for prot in ('http', 'https'))
-        )
+        pages = itertools.chain(*(
+            site.exturlusage(url='*.bilibili.com', protocol=prot, namespaces=ns)
+            for prot in ('http', 'https')
+            for ns in namespaces
+        ))
     try:
         process = TaskProcess() if asynchronous else NoneProcess()
         print(process)
@@ -77,6 +87,7 @@ def remove_bililink_userpath(
                 if page.title() == start_from:
                     skipping = False
                 else:
+                    print('skip', page.title())
                     continue
             process.add(print, page.title())
             for link in page.extlinks():
@@ -97,8 +108,15 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('pages', nargs='*')
     parser.add_argument('-s', '--start')
+    parser.add_argument('-n', '--ns', nargs='*')
     parser.add_argument('-c', '--sync', action='store_true')
     parser.add_argument('-a', '--auto', action='store_true')
     args = parser.parse_args()
     print(args)
-    remove_bililink_userpath(pages=args.pages, start_from=args.start, asynchronous=not args.sync, auto_submit=args.auto)
+    remove_bililink_userpath(
+        pages=args.pages,
+        start_from=args.start,
+        asynchronous=not args.sync,
+        auto_submit=args.auto,
+        namespaces=args.ns
+    )
