@@ -1,4 +1,3 @@
-from email.policy import default
 import pywikibot as pwb
 import urllib.parse as urlp
 import asyncio as aio

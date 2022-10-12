@@ -62,7 +62,7 @@ def traverse_all_disambigs_main():
         traverse_all_disambigs()
     elif len(sys.argv) == 2:
         traverse_all_disambigs(sys.argv[1])
-    # next time from 曲奇
+    # next time from 犬神
 
 
 if __name__ == '__main__':
