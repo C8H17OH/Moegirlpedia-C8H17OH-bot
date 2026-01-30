@@ -1,4 +1,4 @@
-import pywikibot
+import pywikibot, pywikibot.site
 import json
 import sys
 import traceback
@@ -8,7 +8,7 @@ from disambig_task_process import TaskProcess
 from disambig_basic import NoneProcess
 
 
-def traverse_all_disambigs_redo(site: pywikibot.Site, disambig: pywikibot.Page, process: TaskProcess):
+def traverse_all_disambigs_redo(site: pywikibot.site.APISite, disambig: pywikibot.Page, process: TaskProcess):
     disambig = pywikibot.Page(site, disambig.title())
     except_file = open("disambig_except.json", mode="r", encoding="UTF-8")
     excepts = json.load(except_file)
@@ -18,7 +18,8 @@ def traverse_all_disambigs_redo(site: pywikibot.Site, disambig: pywikibot.Page, 
 
 
 def traverse_all_disambigs(startfrom: str = ""):
-    site: pywikibot.APISite = pywikibot.Site()
+    site = pywikibot.Site()
+    assert isinstance(site, pywikibot.site.APISite)
     site.login()
     disambig_category = pywikibot.Category(site, "Category:消歧义页")
     except_file = open("disambig_except.json", mode="r", encoding="UTF-8")
